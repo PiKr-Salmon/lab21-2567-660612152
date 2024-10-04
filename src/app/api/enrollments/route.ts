@@ -1,5 +1,5 @@
 import { checkToken } from "@lib/checkToken";
-import { Payload } from "@lib/types";
+import { Database, Payload } from "@lib/types";
 import { NextRequest, NextResponse } from "next/server";
 import { getPrisma } from "@lib/getPrisma";
 
@@ -81,11 +81,45 @@ export const POST = async (request: NextRequest) => {
   }
 
   // Coding in lecture
+  const prisma = getPrisma();
+  const course = await prisma.course.findUnique({
+    where: { courseNo },
+  });
+  if (!course) {
+    return NextResponse.json(
+      {
+        ok: false,
+        message: "Course number does not exists",
+      },
+      { status: 400 }
+    );
+  }
 
+  const enrollment = await prisma.enrollment.findFirst({
+    where: { courseNo: course.courseNo, studentId },
+  });
+  if (enrollment) {
+    return NextResponse.json(
+      {
+        ok: false,
+        message: "You already registered this course",
+      },
+      { status: 400 }
+    );
+  }
+
+  const newEnrollment = await prisma.enrollment.create({
+    data: {
+      courseNo: course.courseNo,
+      studentId,
+    },
+  });
+  if (newEnrollment) {
   return NextResponse.json({
     ok: true,
     message: "You has enrolled a course successfully",
   });
+  }
 };
 
 // Need review together with drop enrollment form.
@@ -127,6 +161,25 @@ export const DELETE = async (request: NextRequest) => {
 
   const prisma = getPrisma();
   // Perform data delete
+  const enrollment = await prisma.enrollment.findFirst({
+    where: { courseNo, studentId },
+  });
+  if (!enrollment) {
+    return NextResponse.json(
+      {
+        ok: false,
+        message: "You are not enrolled in this course",
+      },
+      { status: 404 }
+    );
+  }
+  
+  await prisma.enrollment.findFirst({
+      where: {
+        courseNo: courseNo,
+        studentId: studentId,
+      },
+  });
 
   return NextResponse.json({
     ok: true,
